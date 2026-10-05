@@ -5,6 +5,7 @@
   "packageType": "app",
   "appName": "TizenBrew IPTV",
   "appPath": "app/index.html",
+  "serviceFile": "service/service.js",
   "keys": [],
   "evaluateScriptOnDocumentStart": false
 }
