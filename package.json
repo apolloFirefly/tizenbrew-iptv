@@ -1,0 +1,10 @@
+{
+  "name": "tizenbrew-iptv",
+  "version": "0.1.0",
+  "description": "Minimal TizenBrew IPTV application starter",
+  "packageType": "app",
+  "appName": "TizenBrew IPTV",
+  "appPath": "app/index.html",
+  "keys": [],
+  "evaluateScriptOnDocumentStart": false
+}
