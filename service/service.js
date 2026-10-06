@@ -191,9 +191,10 @@ async function getConnectionStatus(config) {
   };
 }
 
-function liveStreamUrl(config, streamId) {
+function liveStreamUrl(config, streamId, format) {
+  const extension = format === 'ts' ? 'ts' : 'm3u8';
   return new URL(config.baseUrl + '/live/' + encodeURIComponent(config.username) + '/' +
-    encodeURIComponent(config.password) + '/' + encodeURIComponent(streamId) + '.m3u8');
+    encodeURIComponent(config.password) + '/' + encodeURIComponent(streamId) + '.' + extension);
 }
 
 function rewriteManifest(text, upstreamUrl, streamId) {
@@ -237,7 +238,8 @@ async function proxyStream(request, response, config, target, streamId, redirect
     upstream.resume();
     throw new Error('Provider refused this stream');
   }
-  const contentType = String(upstream.headers['content-type'] || 'application/octet-stream');
+  const contentType = String(upstream.headers['content-type'] ||
+    (target.pathname.endsWith('.ts') ? 'video/mp2t' : 'application/octet-stream'));
   const isManifest = contentType.includes('mpegurl') || target.pathname.endsWith('.m3u8');
 
   if (isManifest) {
@@ -338,21 +340,21 @@ async function handleRequest(request, response) {
     return;
   }
 
-  const streamMatch = url.pathname.match(/^\/api\/xtream\/stream\/(\d+)(?:\/(resource))?$/);
+  const streamMatch = url.pathname.match(/^\/api\/xtream\/stream\/(\d+)(?:\.(m3u8|ts))?(?:\/(resource))?$/);
   if (request.method === 'GET' && streamMatch) {
     const config = requireConfig(response);
     if (!config) return;
     const streamId = streamMatch[1];
     let target;
     try {
-      if (streamMatch[2]) {
+      if (streamMatch[3]) {
         const token = url.searchParams.get('token') || '';
         if (!/^[a-f0-9]{58,16384}$/.test(token)) throw new Error('Invalid token');
         const sealed = Buffer.from(token, 'hex');
         const decipher = crypto.createDecipheriv('aes-256-gcm', resourceKey, sealed.slice(0, 12));
         decipher.setAuthTag(sealed.slice(12, 28));
         target = new URL(Buffer.concat([decipher.update(sealed.slice(28)), decipher.final()]).toString('utf8'));
-      } else target = liveStreamUrl(config, streamId);
+      } else target = liveStreamUrl(config, streamId, streamMatch[2]);
     } catch (_error) {
       sendJson(response, 400, { error: 'Stream resource URL is invalid' });
       return;
@@ -382,4 +384,4 @@ if (inTizenBrew || require.main === module) {
   });
 }
 
-module.exports = { ServiceError, buildApiUrl, normalizeConfig, publicConfig, rewriteManifest, server };
+module.exports = { ServiceError, buildApiUrl, liveStreamUrl, normalizeConfig, publicConfig, rewriteManifest, server };

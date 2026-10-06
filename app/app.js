@@ -2,6 +2,7 @@
 const API = location.port === '8080' || location.port === '8081' ? 'http://localhost:8090' : location.origin;
 const $ = (id) => document.getElementById(id);
 let demo = false, current = null, items = [], page = 0, requestVersion = 0, hls = null;
+let playbackFormat = 'm3u8', fallbackTried = false;
 let favorites = {};
 try { favorites = JSON.parse(localStorage.getItem('brew-favorites') || '{}'); } catch (_) {}
 const pageSize = 30;
@@ -65,24 +66,39 @@ function stopPlayer() {
   if (hls) { hls.destroy(); hls = null; }
   $('player').pause(); $('player').removeAttribute('src'); $('player').load();
 }
-function playChannel(channel) {
+function playChannel(channel, format) {
+  const changedChannel = !current || current.stream_id !== channel.stream_id;
+  if (changedChannel) fallbackTried = false;
+  playbackFormat = format || 'm3u8';
   current = channel; stopPlayer();
   $('placeholder').hidden = false; $('now-playing').textContent = channel.name;
   $('player-error').textContent = '';
   $('favorite-toggle').textContent = favorites[favoriteKey(channel)] ? '★' : '☆';
   if (demo) { $('playback-status').textContent = 'Demostración visual: este canal es ficticio.'; renderChannels(); return; }
-  $('playback-status').textContent = 'Conectando al canal…';
-  const url = API + '/api/xtream/stream/' + encodeURIComponent(channel.stream_id);
+  $('playback-status').textContent = 'Conectando al canal (' + playbackFormat.toUpperCase() + ')…';
+  const url = API + '/api/xtream/stream/' + encodeURIComponent(channel.stream_id) + '.' + playbackFormat;
   const video = $('player');
   const begin = () => { const promise = video.play(); if (promise) promise.catch(() => { $('playback-status').textContent = 'Pulsa Reproducir para comenzar.'; }); };
-  if (video.canPlayType('application/vnd.apple.mpegurl')) {
+  const tryTsFallback = () => {
+    if (playbackFormat !== 'm3u8' || fallbackTried) return false;
+    fallbackTried = true;
+    $('playback-status').textContent = 'El formato HLS falló. Probando TS…';
+    playChannel(channel, 'ts');
+    return true;
+  };
+  if (playbackFormat === 'ts') {
+    video.src = url; begin();
+  } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
     video.src = url; begin();
   } else if (window.Hls && Hls.isSupported()) {
     hls = new Hls({ maxBufferLength: 20, maxMaxBufferLength: 40 });
     hls.loadSource(url); hls.attachMedia(video);
     hls.on(Hls.Events.MANIFEST_PARSED, begin);
     hls.on(Hls.Events.ERROR, (_event,data) => {
-      if (data.fatal) { $('player-error').textContent = 'No se pudo reproducir el canal. Prueba Reintentar u otro canal.'; $('playback-status').textContent = 'Reproducción interrumpida'; }
+      if (data.fatal && !tryTsFallback()) {
+        $('player-error').textContent = 'No se pudo reproducir el canal ni con HLS ni con TS.';
+        $('playback-status').textContent = 'Reproducción interrumpida';
+      }
     });
   } else $('player-error').textContent = 'Este navegador no ofrece reproducción HLS compatible.';
   renderChannels();
@@ -147,7 +163,13 @@ $('toggle').onclick = toggle;
 $('fullscreen').onclick = () => { if (current && !demo) document.body.classList.toggle('cinema'); };
 $('player').onplaying = () => { $('placeholder').hidden = true; $('playback-status').textContent = 'Reproduciendo en directo'; $('player-error').textContent = ''; };
 $('player').onwaiting = () => { $('playback-status').textContent = 'Cargando vídeo…'; };
-$('player').onerror = () => { if (current && !demo) $('player-error').textContent = 'El canal no está disponible o su formato no es compatible.'; };
+$('player').onerror = () => {
+  if (!current || demo) return;
+  if (playbackFormat === 'm3u8' && !fallbackTried) {
+    fallbackTried = true;
+    playChannel(current, 'ts');
+  } else $('player-error').textContent = 'El canal no está disponible o su formato no es compatible (HLS y TS fallaron).';
+};
 document.addEventListener('keydown', event => {
   const code = event.keyCode;
   if (code === 10009 || event.key === 'Escape') {

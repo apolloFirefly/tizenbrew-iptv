@@ -14,7 +14,7 @@ test('starts inside TizenBrew VM without __dirname or require.main', () => {
   assert.equal(listening,true);
 });
 
-const { ServiceError, buildApiUrl, normalizeConfig, publicConfig, rewriteManifest, server } = require('./service');
+const { ServiceError, buildApiUrl, liveStreamUrl, normalizeConfig, publicConfig, rewriteManifest, server } = require('./service');
 
 function listen(target) {
   return new Promise((resolve, reject) => {
@@ -66,6 +66,12 @@ test('builds player_api URL and keeps password out of public config', () => {
   assert.equal(Object.hasOwn(publicConfig(config), 'password'), false);
 });
 
+test('creates HLS and transport-stream live URLs', () => {
+  const config = { baseUrl: 'https://iptv.example', username: 'name', password: 'secret' };
+  assert.equal(liveStreamUrl(config, 42).pathname, '/live/name/secret/42.m3u8');
+  assert.equal(liveStreamUrl(config, 42, 'ts').pathname, '/live/name/secret/42.ts');
+});
+
 test('rewrites HLS segments and URI attributes through the local proxy', () => {
   const manifest = '#EXTM3U\n#EXT-X-KEY:METHOD=AES-128,URI="keys/live.key"\nsegment-1.ts\n';
   const result = rewriteManifest(manifest, new URL('https://iptv.example/live/list.m3u8'), '42');
@@ -98,6 +104,7 @@ test('serves status, categories, channels, and an HLS manifest end to end', asyn
       response.end('#EXTM3U\nsegment.ts\n');
       return;
     }
+    if (url.pathname === '/live/user/pass/42.ts') { response.end('transport-stream-fixture'); return; }
     if (url.pathname === '/live/user/pass/segment.ts') { response.end('segment-fixture'); return; }
     response.writeHead(404).end();
   });
@@ -124,6 +131,7 @@ test('serves status, categories, channels, and an HLS manifest end to end', asyn
     assert.equal((await fetch(base + '/health', {headers:{Origin:'https://untrusted.example'}})).status,403);
     assert.equal((await fetch(base + '/health', {headers:{Origin:'http://127.0.0.1:8081'}})).status,200);
     assert.equal((await fetch(base + '/api/xtream/stream/42/resource?token=bad')).status,400);
+    assert.equal(await fetch(base + '/api/xtream/stream/42.ts').then(r => r.text()), 'transport-stream-fixture');
   } finally {
     delete process.env.XTREAM_BASE_URL;
     delete process.env.XTREAM_USERNAME;
