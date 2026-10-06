@@ -113,6 +113,17 @@ $('config-form').onsubmit = async event => {
 };
 $('demo').onclick = () => { demo = true; showBrowser(); };
 $('settings').onclick = () => { stopPlayer(); showSetup(); };
+function exitModule() {
+  stopPlayer();
+  const onTizenBrew = (location.hostname === '127.0.0.1' || location.hostname === 'localhost') &&
+    location.port === '8081';
+  if (onTizenBrew) {
+    location.replace('http://127.0.0.1:8081/');
+    return;
+  }
+  history.back();
+}
+$('exit').onclick = exitModule;
 $('search').oninput = () => { page = 0; renderChannels(); };
 function focusChannel() { const first = $('channels').querySelector('button'); if (first) first.focus(); }
 $('previous').onclick = () => { page--; renderChannels(); focusChannel(); };
@@ -142,8 +153,7 @@ document.addEventListener('keydown', event => {
   if (code === 10009 || event.key === 'Escape') {
     event.preventDefault();
     if (document.body.classList.contains('cinema')) document.body.classList.remove('cinema');
-    else if (!$('setup').hidden && current) { $('setup').hidden=true; $('browser').hidden=false; $('settings').focus(); }
-    else $('settings').focus();
+    else exitModule();
     return;
   }
   if ([10252,415,19,413].indexOf(code)>=0) {
