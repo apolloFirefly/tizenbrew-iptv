@@ -220,8 +220,10 @@ function isAllowedStreamResource(config, target) {
   return target.protocol === server.protocol && target.host === server.host;
 }
 
-async function proxyStream(request, response, config, target, streamId, redirects = 0) {
-  if (!isAllowedStreamResource(config, target)) {
+async function proxyStream(request, response, config, target, streamId, redirects = 0, allowExternal = false) {
+  // Direct requests must stay on the provider host. URLs decoded from an
+  // authenticated manifest token may point at its media CDN.
+  if (!allowExternal && !isAllowedStreamResource(config, target)) {
     sendJson(response, 400, { error: 'Stream resource host is not allowed' });
     return;
   }
@@ -232,7 +234,7 @@ async function proxyStream(request, response, config, target, streamId, redirect
     upstream.resume();
     if (!upstream.headers.location || redirects >= 4) throw new Error('Too many stream redirects');
     const next = new URL(upstream.headers.location, target);
-    return proxyStream(request, response, config, next, streamId, redirects + 1);
+    return proxyStream(request, response, config, next, streamId, redirects + 1, true);
   }
   if (upstream.statusCode >= 400) {
     upstream.resume();
@@ -359,7 +361,7 @@ async function handleRequest(request, response) {
       sendJson(response, 400, { error: 'Stream resource URL is invalid' });
       return;
     }
-    await proxyStream(request, response, config, target, streamId);
+    await proxyStream(request, response, config, target, streamId, 0, Boolean(streamMatch[3]));
     return;
   }
   sendJson(response, 404, { error: 'Not found' });

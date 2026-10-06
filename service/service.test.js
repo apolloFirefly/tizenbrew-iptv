@@ -81,6 +81,12 @@ test('rewrites HLS segments and URI attributes through the local proxy', () => {
 });
 
 test('serves status, categories, channels, and an HLS manifest end to end', async () => {
+  const cdn = http.createServer((request, response) => {
+    if (request.url === '/segment.ts') { response.end('cdn-segment-fixture'); return; }
+    if (request.url === '/stream.ts') { response.end('cdn-transport-stream-fixture'); return; }
+    response.writeHead(404).end();
+  });
+  const cdnPort = await listen(cdn);
   const upstream = http.createServer((request, response) => {
     const url = new URL(request.url, 'http://localhost');
     if (url.pathname === '/player_api.php' && !url.searchParams.get('action')) {
@@ -101,11 +107,13 @@ test('serves status, categories, channels, and an HLS manifest end to end', asyn
     }
     if (url.pathname === '/live/user/pass/42.m3u8') {
       response.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
-      response.end('#EXTM3U\nsegment.ts\n');
+      response.end('#EXTM3U\nhttp://127.0.0.1:' + cdnPort + '/segment.ts\n');
       return;
     }
-    if (url.pathname === '/live/user/pass/42.ts') { response.end('transport-stream-fixture'); return; }
-    if (url.pathname === '/live/user/pass/segment.ts') { response.end('segment-fixture'); return; }
+    if (url.pathname === '/live/user/pass/42.ts') {
+      response.writeHead(302, { Location: 'http://127.0.0.1:' + cdnPort + '/stream.ts' }).end();
+      return;
+    }
     response.writeHead(404).end();
   });
 
@@ -127,16 +135,17 @@ test('serves status, categories, channels, and an HLS manifest end to end', asyn
     assert.match(manifest, /\/api\/xtream\/stream\/42\/resource\?token=/);
     assert.equal(manifest.includes('/user/pass'), false);
     const resource = new URL(manifest.split('\n')[1]);
-    assert.equal(await fetch(base + resource.pathname + resource.search).then(r => r.text()), 'segment-fixture');
+    assert.equal(await fetch(base + resource.pathname + resource.search).then(r => r.text()), 'cdn-segment-fixture');
     assert.equal((await fetch(base + '/health', {headers:{Origin:'https://untrusted.example'}})).status,403);
     assert.equal((await fetch(base + '/health', {headers:{Origin:'http://127.0.0.1:8081'}})).status,200);
     assert.equal((await fetch(base + '/api/xtream/stream/42/resource?token=bad')).status,400);
-    assert.equal(await fetch(base + '/api/xtream/stream/42.ts').then(r => r.text()), 'transport-stream-fixture');
+    assert.equal(await fetch(base + '/api/xtream/stream/42.ts').then(r => r.text()), 'cdn-transport-stream-fixture');
   } finally {
     delete process.env.XTREAM_BASE_URL;
     delete process.env.XTREAM_USERNAME;
     delete process.env.XTREAM_PASSWORD;
     await close(server);
     await close(upstream);
+    await close(cdn);
   }
 });
