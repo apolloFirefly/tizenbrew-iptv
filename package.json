@@ -1,6 +1,6 @@
 {
   "name": "tizenbrew-iptv",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "files": ["app/", "service/service.js", "README.md"],
   "description": "Minimal TizenBrew IPTV application starter",
   "scripts": {
