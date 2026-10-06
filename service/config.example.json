@@ -1,0 +1,5 @@
+{
+  "baseUrl": "http://iptv.example.com:8080",
+  "username": "your-username",
+  "password": "your-password"
+}

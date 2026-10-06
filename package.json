@@ -1,11 +1,21 @@
 {
   "name": "tizenbrew-iptv",
-  "version": "0.1.0",
+  "version": "0.2.0",
+  "files": ["app/", "service/service.js", "README.md"],
   "description": "Minimal TizenBrew IPTV application starter",
+  "scripts": {
+    "start": "node service/service.js",
+    "check": "node --check service/service.js && node --check app/app.js && node --test service/service.test.js"
+  },
   "packageType": "app",
   "appName": "TizenBrew IPTV",
   "appPath": "app/index.html",
   "serviceFile": "service/service.js",
-  "keys": [],
+  "keys": [
+    "MediaPlayPause",
+    "MediaPlay",
+    "MediaPause",
+    "MediaStop"
+  ],
   "evaluateScriptOnDocumentStart": false
 }

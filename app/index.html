@@ -1,16 +1,17 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>TizenBrew IPTV</title>
-  <link rel="stylesheet" href="styles.css">
-</head>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TizenBrew IPTV</title><link rel="stylesheet" href="styles.css"></head>
 <body>
-  <main>
-    <h1>TizenBrew IPTV</h1>
-    <p id="status" role="status"></p>
-  </main>
-  <script src="app.js"></script>
-</body>
-</html>
+<header><div class="brand"><span class="mark">▰</span> BREW<span class="thin">TV</span><small>LIVE TELEVISION</small></div><div class="top-actions"><span id="service-status" role="status">Conectando…</span><button id="settings">Ajustes</button><time id="clock"></time></div></header>
+<main>
+<section id="setup" hidden>
+<div class="intro"><p class="eyebrow">TU TELEVISIÓN. A TU MANERA.</p><h1>Elige qué ver.<br><span>Hazlo tuyo.</span></h1><p>Todos tus canales en un lugar.<br>Conecta tu cuenta y empieza a explorar.</p><div class="intro-tags"><span>TV en directo</span><span>Favoritos</span><span>Control con mando</span></div><button id="demo" class="secondary">Explorar demostración →</button><p class="fine">La demostración muestra canales ficticios. No modifica tu cuenta.</p></div>
+<div class="connect-card"><p class="eyebrow">EMPEZAR</p><h2>Conecta tu cuenta</h2><p>Usa los datos de acceso de tu proveedor Xtream.</p><form id="config-form"><label>Servidor<input id="base-url" type="url" placeholder="https://servidor:puerto" required></label><div class="form-row"><label>Usuario<input id="username" autocomplete="username" required></label><label>Contraseña<input id="password" type="password" autocomplete="current-password" required></label></div><button class="primary" type="submit">Conectar y explorar →</button></form><p id="config-error" class="error" role="alert"></p><p class="fine">La cuenta se guarda en este dispositivo.</p></div>
+</section>
+<section id="browser" hidden>
+<aside><p class="eyebrow">TU BIBLIOTECA</p><h2>En directo</h2><button id="favorites">☆ Favoritos</button><p class="section-label">CATEGORÍAS</p><nav id="categories" class="scroll"></nav></aside>
+<section class="catalog"><div class="catalog-heading"><div><p class="eyebrow">EXPLORA</p><h2 id="channel-heading">Canales</h2></div><span id="channel-count"></span></div><input id="search" type="search" placeholder="Buscar en esta categoría…" aria-label="Buscar canales"><div id="channels" class="scroll"></div><div class="pages"><button id="previous">← Anterior</button><span id="page-label"></span><button id="next">Siguiente →</button></div></section>
+<section class="watch"><div id="screen"><video id="player" playsinline></video><div id="placeholder"><span class="screen-symbol">▰</span><h2>Tu próximo canal<br>te está esperando.</h2><p>Selecciona un canal para comenzar.</p></div><span class="live-badge">EN DIRECTO</span></div><p class="eyebrow">AHORA VIENDO</p><h2 id="now-playing">Elige algo que te guste</h2><p id="playback-status" role="status">Navega con las flechas y pulsa OK.</p><div class="player-actions"><button id="toggle">Reproducir / Pausar</button><button id="fullscreen">Pantalla completa</button><button id="favorite-toggle" aria-label="Añadir a favoritos">☆</button><button id="retry">Reintentar</button></div><p id="player-error" class="error" role="alert"></p></section>
+</section>
+</main><footer><span><kbd>↑ ↓ ← →</kbd> Navegar</span><span><kbd>OK</kbd> Seleccionar</span><span><kbd>Volver</kbd> Salir del reproductor</span><span class="footer-brand">BREW TV · PERSONAL PLAYER</span></footer>
+<script src="vendor/hls.min.js"></script><script src="app.js"></script></body></html>
