@@ -17,6 +17,13 @@ allowedOrigins.push('http://localhost:' + PORT, 'http://127.0.0.1:' + PORT);
 const REQUEST_TIMEOUT_MS = 15000;
 const MAX_JSON_BYTES = 10 * 1024 * 1024;
 
+class ServiceError extends Error {
+  constructor(code, message) {
+    super(message);
+    this.code = code;
+  }
+}
+
 function sendJson(response, statusCode, value) {
   response.writeHead(statusCode, { 'Content-Type': 'application/json; charset=utf-8' });
   response.end(JSON.stringify(value));
@@ -24,7 +31,7 @@ function sendJson(response, statusCode, value) {
 
 function normalizeConfig(value) {
   if (!value || typeof value !== 'object') throw new Error('Configuration must be an object');
-  const baseUrl = String(value.baseUrl || '').trim().replace(/\/+$/, '');
+  let baseUrl = String(value.baseUrl || '').trim().replace(/\/+$/, '');
   const username = String(value.username || '').trim();
   const password = String(value.password || '');
   let parsedUrl;
@@ -40,6 +47,10 @@ function normalizeConfig(value) {
   if (!username || !password) throw new Error('Username and password are required');
   if (parsedUrl.username || parsedUrl.password || parsedUrl.search || parsedUrl.hash) {
     throw new Error('Use only the server base URL, without credentials or query parameters');
+  }
+  if (parsedUrl.pathname.endsWith('/player_api.php')) {
+    parsedUrl.pathname = parsedUrl.pathname.slice(0, -'/player_api.php'.length) || '/';
+    baseUrl = parsedUrl.toString().replace(/\/$/, '');
   }
   return { baseUrl, username, password };
 }
@@ -97,9 +108,12 @@ function requestUpstream(url, options = {}) {
       headers: options.headers || {}
     }, resolve);
     upstreamRequest.setTimeout(REQUEST_TIMEOUT_MS, () => {
-      upstreamRequest.destroy(new Error('Xtream request timed out'));
+      upstreamRequest.destroy(new ServiceError('TIMEOUT', 'El servidor Xtream no respondió en 15 segundos.'));
     });
-    upstreamRequest.on('error', reject);
+    upstreamRequest.on('error', (error) => {
+      if (error instanceof ServiceError) return reject(error);
+      reject(new ServiceError('NETWORK', 'La TV no puede conectarse al servidor Xtream. Revisa la URL, red y DNS.'));
+    });
     upstreamRequest.end();
   });
 }
@@ -108,7 +122,7 @@ async function fetchJson(url) {
   const upstream = await requestUpstream(url, { headers: { Accept: 'application/json' } });
   if (upstream.statusCode < 200 || upstream.statusCode >= 300) {
     upstream.resume();
-    throw new Error('Xtream returned HTTP ' + upstream.statusCode);
+    throw new ServiceError('HTTP_' + upstream.statusCode, 'El servidor Xtream respondió HTTP ' + upstream.statusCode + '. Revisa la URL y las credenciales.');
   }
   const chunks = [];
   let size = 0;
@@ -120,7 +134,11 @@ async function fetchJson(url) {
     }
     chunks.push(chunk);
   }
-  return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  } catch (_error) {
+    throw new ServiceError('INVALID_JSON', 'El servidor no devolvió una respuesta Xtream válida. Comprueba que la URL base sea correcta.');
+  }
 }
 
 function readJsonBody(request) {
@@ -347,8 +365,13 @@ async function handleRequest(request, response) {
 
 const server = http.createServer((request, response) => {
   handleRequest(request, response).catch((error) => {
-    console.error('IPTV request failed');
-    if (!response.headersSent) sendJson(response, 502, { error: 'No se pudo completar la solicitud. Comprueba el servidor y la conexión.' });
+    console.error('IPTV request failed:', error.code || 'UNKNOWN');
+    if (!response.headersSent) {
+      const message = error instanceof ServiceError
+        ? error.message
+        : 'La solicitud falló. Comprueba la URL, las credenciales y la conexión de la TV.';
+      sendJson(response, 502, { error: message, code: error.code || 'UNKNOWN' });
+    }
     else response.destroy(error);
   });
 });
@@ -359,4 +382,4 @@ if (inTizenBrew || require.main === module) {
   });
 }
 
-module.exports = { buildApiUrl, normalizeConfig, publicConfig, rewriteManifest, server };
+module.exports = { ServiceError, buildApiUrl, normalizeConfig, publicConfig, rewriteManifest, server };

@@ -14,7 +14,7 @@ test('starts inside TizenBrew VM without __dirname or require.main', () => {
   assert.equal(listening,true);
 });
 
-const { buildApiUrl, normalizeConfig, publicConfig, rewriteManifest, server } = require('./service');
+const { ServiceError, buildApiUrl, normalizeConfig, publicConfig, rewriteManifest, server } = require('./service');
 
 function listen(target) {
   return new Promise((resolve, reject) => {
@@ -39,9 +39,21 @@ test('normalizes valid Xtream configuration', () => {
   });
 });
 
+test('accepts a copied player_api.php URL as the Xtream server URL', () => {
+  assert.equal(normalizeConfig({
+    baseUrl: 'http://provider.example:8080/player_api.php', username: 'user', password: 'secret'
+  }).baseUrl, 'http://provider.example:8080');
+});
+
 test('rejects unsafe protocols and missing credentials', () => {
   assert.throws(() => normalizeConfig({ baseUrl: 'file:///etc/passwd', username: 'u', password: 'p' }));
   assert.throws(() => normalizeConfig({ baseUrl: 'https://iptv.example', username: '', password: 'p' }));
+});
+
+test('uses safe user-facing errors for network failures', () => {
+  const error = new ServiceError('NETWORK', 'La TV no puede conectarse al servidor Xtream. Revisa la URL, red y DNS.');
+  assert.equal(error.code, 'NETWORK');
+  assert.equal(error.message.includes('password'), false);
 });
 
 test('builds player_api URL and keeps password out of public config', () => {
